@@ -1,0 +1,8 @@
+.env
+temp/
+outputs/
+bin/
+__pycache__/
+*.pyc
+.venv/
+system_prompt.txt
