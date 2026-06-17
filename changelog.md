@@ -2,26 +2,26 @@
 
 Toutes les modifications apportées au projet seront tracées ici.
 
-## [3.0.0] - 2026-06-17
-### Majeur (Cloud & Sécurité)
+## [1.0.0] - 2026-06-17
+### Lancement Officiel (Première version publique)
 - **Déploiement Hybride (Render.com) :** L'application est désormais conçue pour être déployée publiquement sur le cloud ou exécutée localement de manière transparente.
 - **Stockage Sécurisé (BYOK) :** Les clés API et le System Prompt ne sont plus jamais enregistrés sur le serveur (suppression du fichier `.env`). Un script JavaScript utilise le `LocalStorage` du navigateur web de l'utilisateur pour une sécurité multi-tenants parfaite.
 - **Conteneurisation (Docker) :** Création d'un `Dockerfile` officiel pour Render afin d'installer le package système `ffmpeg` sous Linux, remplaçant intelligemment le besoin de `ffmpeg.exe` sous Windows.
 - **Interface (UI) :** Refonte esthétique complète (thème sombre "Studio Console" Slate & Sky Blue), centrage automatique via CSS Grid/Flexbox, et renommage officiel en "Voice-Gen".
 
-## [2.2.0] - 2026-06-16
+## [0.9.2] - 2026-06-16 (Interne)
 ### Ajouté (Dual-Engine)
 - **Retour de GPT-4o Audio :** Intégration de l'API OpenAI (`gpt-4o-audio-preview`) comme Moteur 2 de rendu, en remplacement du moteur Veo trop restrictif.
 - **Support des voix OpenAI :** Ajout d'un menu déroulant conditionnel pour sélectionner les 6 voix officielles d'OpenAI (`alloy`, `echo`, `fable`, `onyx`, `nova`, `shimmer`).
 - **Gestion Multi-Clés :** L'onglet paramètres enregistre désormais simultanément les clés Google, OpenAI et Anthropic dans le fichier `.env`.
 
-## [2.1.0] - 2026-06-16
+## [0.9.1] - 2026-06-16 (Interne)
 ### Modifié (Architecture Audio)
 - **Implémentation de la Live API (WebSockets) :** Refonte asynchrone (`async`/`await`) du moteur audio pour utiliser `client.aio.live.connect`.
 - **Restauration de l'Audio Génératif :** Remplacement des modèles TTS de base par les modèles multimodaux natifs (`gemini-2.5-flash`, `gemini-2.0-flash`) permettant un véritable jeu d'acteur génératif.
 - Assemblage du flux binaire brut (PCM 16-bit 24kHz) reçu de la Live API via `pydub`.
 
-## [2.0.0] - 2026-06-16
+## [0.9.0] - 2026-06-16 (Interne)
 ### Modifié (Pivot Majeur)
 - **Migration vers Google GenAI** : Le moteur principal de génération vocale (OpenAI) a été entièrement retiré et remplacé par l'API Google Gemini (`gemini-2.0-flash-exp`). L'application utilise les voix intégrées de Gemini (`Charon`, `Puck`, `Aoede`, etc.).
 - Intégration du SDK `google-genai` et ajout d'un sélecteur de moteur ("Gemini" ou "Veo").

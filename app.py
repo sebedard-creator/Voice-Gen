@@ -417,7 +417,7 @@ with gr.Blocks(title="Voice-Gen") as demo:
                     generate_btn = gr.Button("🎧 Générer la piste", variant="primary")
                     
             audio_output = gr.Audio(label="Piste Générée (48kHz, 24-bit WAV)", type="filepath")
-            gr.Markdown("<div style='text-align: right; font-size: 0.75rem; color: #64748b; margin-top: 1rem;'>v1.0 - Sébastien Bédard - 2026</div>", elem_classes="transparent-block")
+            gr.Markdown("<div style='text-align: right; font-size: 0.75rem; color: #64748b; margin-top: 1rem;'>v1.0 - Sébastien Bédard - 2026 | <a href='https://github.com/sebedard-creator/Voice-Gen' target='_blank' style='color: #64748b; text-decoration: underline;'>GitHub</a></div>", elem_classes="transparent-block")
             
         # ONGLET 2 : PARAMÈTRES
         with gr.Tab("Paramètres"):
