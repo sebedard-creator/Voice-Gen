@@ -2,8 +2,16 @@
 
 Toutes les modifications apportées au projet seront tracées ici.
 
+## [2.0.0] - 2026-06-18
+### Ajouté / Modifié (Pivot Architectural Majeur)
+- **Didascalies Furtives (Stealth Mode) :** Refonte totale de l'intégration Anthropic. Claude analyse désormais le script et génère une direction d'acteur en anglais (`[Hesitant, emotional]`) qui est **injectée secrètement** dans le System Prompt. Le script de l'utilisateur n'est plus pollué par des balises visibles.
+- **Contrôle de Durée (Pacing Slider) :** Ajout d'un slider d'interface ("Rapide", "Normal", "Long") qui contraint mathématiquement la durée de l'audio généré (via des instructions de mots-par-seconde envoyées aux modèles).
+- **Anti-Conversational Filler :** Ajout d'une encapsulation dynamique à la toute dernière milliseconde avant l'envoi API pour bloquer formellement les réponses de type "D'accord, voici le texte".
+- **Accent Québécois Authentique :** Réécriture en profondeur du Negative Prompting par défaut pour forcer un accent québécois montréalais sans "joual" et empêcher formellement l'accent de France.
+- **Support Étendu OpenAI :** L'interface prend désormais en charge les 11 voix complètes du modèle `gpt-4o-audio-preview`.
+- **Retrait du Mode Script Long :** La fonctionnalité de découpage / assemblage Pydub a été supprimée pour privilégier la pureté du "one-shot" des modèles récents.
+
 ## [1.0.0] - 2026-06-17
-### Lancement Officiel (Première version publique)
 - **Déploiement Hybride (Render.com) :** L'application est désormais conçue pour être déployée publiquement sur le cloud ou exécutée localement de manière transparente.
 - **Stockage Sécurisé (BYOK) :** Les clés API et le System Prompt ne sont plus jamais enregistrés sur le serveur (suppression du fichier `.env`). Un script JavaScript utilise le `LocalStorage` du navigateur web de l'utilisateur pour une sécurité multi-tenants parfaite.
 - **Conteneurisation (Docker) :** Création d'un `Dockerfile` officiel pour Render afin d'installer le package système `ffmpeg` sous Linux, remplaçant intelligemment le besoin de `ffmpeg.exe` sous Windows.

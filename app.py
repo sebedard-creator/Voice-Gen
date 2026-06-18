@@ -13,6 +13,10 @@ from pydub import AudioSegment
 from dotenv import load_dotenv
 import tiktoken
 import re
+import warnings
+
+# Suppression des avertissements de dépréciation (ex: session.send)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # Chargement de l'environnement (Clé API)
 load_dotenv()
@@ -42,21 +46,32 @@ CHARACTER_MAP = {
     "La Narratrice (Douce)": "Aoede",
     "Le Héros (Jeune)": "Puck",
     "Le Méchant (Sombre)": "Fenrir",
+    "La Jeune Fille (Calme)": "Kore",
     "L'Enfant (Énergique)": "Aoede"
 }
 
 OPENAI_VOICE_MAP = {
     "Alloy (Androgyne, Neutre & Versatile)": "alloy",
+    "Ash (Neutre, Calme & Mesuré)": "ash",
+    "Ballad (Femme, Mélodieuse & Fluide)": "ballad",
+    "Coral (Femme, Amicale & Énergique)": "coral",
     "Echo (Homme, Chaleureux & Profond)": "echo",
     "Fable (Homme, Conteur Expressif)": "fable",
-    "Onyx (Homme, Grave & Sérieux)": "onyx",
     "Nova (Femme, Énergique & Professionnelle)": "nova",
-    "Shimmer (Femme, Douce & Calme)": "shimmer"
+    "Onyx (Homme, Grave & Sérieux)": "onyx",
+    "Sage (Homme, Mature & Réfléchi)": "sage",
+    "Shimmer (Femme, Douce & Calme)": "shimmer",
+    "Verse (Femme, Rythmique & Poétique)": "verse"
 }
 
-DEFAULT_SYSTEM_PROMPT = """You are a professional voice actor recording in a soundproof vocal booth. Your track must be clinical and completely 'dry'. Absolute and unbreakable rules:
-1. You must generate ONLY the human voice. No sound effects (foley), no ambient noises, no reverberation, no music.
-2. DO NOT introduce the text. DO NOT say "Sure", "Here is the audio", or add any conversational filler. You must immediately begin acting the script and NOTHING ELSE."""
+DEFAULT_SYSTEM_PROMPT = """ROLE: You are a professional French-Canadian voice actor from Montreal, Quebec.
+ENVIRONMENT: Professional soundproof vocal booth.
+TASK: Voice the provided script naturally.
+
+CRITICAL RULES:
+1. AUDIO QUALITY: Output MUST be completely "dry". NO background music, NO room reverberation, NO ambient noise, NO foley/sound effects. ONLY the raw human voice.
+2. ACCENT & DIALECT: Speak in French with a natural, authentic standard Quebec accent (Accent québécois standard international). Do NOT use heavy slang or "joual". The pronunciation should clearly be from Montreal (authentic rhythm and intonation), but keep it professional. Under NO CIRCUMSTANCE should you sound like you are from France.
+3. NO FILLER: Begin acting the script immediately. DO NOT introduce the audio. DO NOT acknowledge the prompt. NO conversational filler."""
 
 def count_tokens(text):
     """Estimation simple (Gemini n'utilise pas tiktoken, on fait une estimation moyenne)"""
@@ -75,9 +90,9 @@ async def generate_audio_chunk(client, model_name, text_chunk, voice_id, system_
     
     # Contournement pour inclure le contexte dans un système asynchrone qui crée de nouvelles sessions
     if not contents and system_prompt:
-        final_text = f"CONSIGNES STRICTES POUR L'ACTEUR :\n{system_prompt}\n\n--- FIN DES CONSIGNES ---\n\nSCRIPT À JOUER :\n{text_chunk}"
+        final_text = f"CONSIGNES STRICTES POUR L'ACTEUR :\n{system_prompt}\n\n--- FIN DES CONSIGNES ---\n\nCRITICAL: DO NOT INTRODUCE THE SCRIPT. DO NOT SAY 'D'accord' OR 'Voici'. JUST READ THIS SCRIPT EXACTLY:\n\n{text_chunk}"
     else:
-        final_text = text_chunk
+        final_text = f"CRITICAL: DO NOT INTRODUCE THE SCRIPT. DO NOT SAY 'D'accord' OR 'Voici'. JUST READ THIS SCRIPT EXACTLY:\n\n{text_chunk}"
         
     config = types.LiveConnectConfig(
         response_modalities=["AUDIO"],
@@ -126,7 +141,8 @@ async def generate_openai_audio_chunk(client, model_name, text_chunk, voice_id, 
     if system_prompt and not messages:
         messages.append({"role": "system", "content": system_prompt})
         
-    messages.append({"role": "user", "content": text_chunk})
+    strict_user_prompt = f"CRITICAL INSTRUCTION: DO NOT INTRODUCE THE SCRIPT. DO NOT SAY 'D'accord', 'Voici', or any conversational filler. Start immediately with the script performance.\n\nSCRIPT TO PERFORM:\n{text_chunk}"
+    messages.append({"role": "user", "content": strict_user_prompt})
     
     response = await client.chat.completions.create(
         model=model_name,
@@ -144,35 +160,10 @@ async def generate_openai_audio_chunk(client, model_name, text_chunk, voice_id, 
     
     return audio_segment, assistant_message
 
-def split_text_intelligently(text):
-    """Divise le texte en chunks logiques pour éviter les coupures brutes."""
-    paragraphs = text.split('\n\n')
-    chunks = []
-    
-    for p in paragraphs:
-        p = p.strip()
-        if not p:
-            continue
-        if len(p) > 500:
-            sentences = re.split(r'(?<=\.)\s+', p)
-            current_chunk = ""
-            for s in sentences:
-                if len(current_chunk) + len(s) > 500:
-                    chunks.append(current_chunk.strip())
-                    current_chunk = s
-                else:
-                    current_chunk += " " + s
-            if current_chunk:
-                chunks.append(current_chunk.strip())
-        else:
-            chunks.append(p)
-            
-    return chunks
-
-def suggest_actor_direction(script, scenario, anthropic_key_override):
-    """Génère une micro-direction d'acteur via l'API Anthropic (Claude)."""
+def generate_hidden_didascalies(script, anthropic_key_override):
+    """Génère une direction d'acteur cachée via l'API Anthropic (Claude)."""
     if not script.strip():
-        raise gr.Error("Veuillez fournir un script pour générer une direction.")
+        raise gr.Error("Veuillez fournir un script pour générer des didascalies.")
         
     anthropic_key = anthropic_key_override.strip() if anthropic_key_override.strip() else os.environ.get("ANTHROPIC_API_KEY")
     if not anthropic_key:
@@ -180,21 +171,10 @@ def suggest_actor_direction(script, scenario, anthropic_key_override):
         
     client = anthropic.Anthropic(api_key=anthropic_key)
     
-    prompt = f"""Tu écris une micro-direction vocale pour un comédien virtuel de post-production.
-
-Donne une seule phrase courte, simple et stable.
-
-Contraintes :
-- Maximum 18 mots.
-- Décris seulement le ton général, le débit et l'intensité.
-- Pas de détails scène par scène.
-- Pas de liste.
-- Pas de métaphores.
-- Mentionne "voix naturelle".
-- Retourne uniquement la direction.
-
-Scénario :
-{scenario}
+    prompt = f"""Tu es un directeur d'acteurs de doublage.
+Analyse le script suivant et fournis une brève instruction de jeu (didascalie émotionnelle et tonale) pour l'acteur virtuel.
+CRITICAL: L'instruction DOIT ÊTRE RÉDIGÉE EN ANGLAIS pour maximiser la compréhension des modèles audio (ex: "Hesitant tone, with a hint of sadness" ou "Energetic and fast voice").
+Ne retourne QUE la didascalie en anglais, sans aucun texte d'introduction ni guillemets.
 
 Script :
 {script}"""
@@ -209,19 +189,28 @@ Script :
         for block in message.content:
             if hasattr(block, "text"):
                 direction += block.text
-        return direction.strip()
+        return direction.strip(), gr.update(value="✅ Didascalies prêtes", variant="primary")
     except Exception as e:
         raise gr.Error(f"Erreur Anthropic : {str(e)}")
 
-async def process_generation(engine, script, direction_output, char_key, use_long_script, google_api_key_override, openai_api_key_override, system_prompt):
+async def process_generation(engine, script, duration_slider, hidden_didascalies, char_key, google_api_key_override, openai_api_key_override, system_prompt):
     """Fonction principale appelée par Gradio."""
     if not script.strip():
         raise gr.Error("Le script est vide.")
         
-    # Injection automatique de la direction générée au début du script
     final_script = script
-    if direction_output and direction_output.strip():
-        final_script = f"[{direction_output.strip()}]\n\n{script}"
+    
+    # Injection du rythme dans le system_prompt
+    pacing_instruction = ""
+    if duration_slider == 0:
+        pacing_instruction = "\n\nCRITICAL CONSTRAINT: TARGET DURATION IS 3 SECONDS (Target word count: 8 to 9 words)."
+    elif duration_slider == 2:
+        pacing_instruction = "\n\nCRITICAL CONSTRAINT: TARGET DURATION IS 10 SECONDS (Target word count: 25 to 30 words)."
+    else:
+        pacing_instruction = "\n\nCRITICAL CONSTRAINT: TARGET DURATION IS 6 SECONDS (Target word count: 15 to 18 words)."
+        
+    didascalie_instruction = f"\n\nACTOR DIRECTION (DIDASCALIES): {hidden_didascalies}" if hidden_didascalies else ""
+    final_system_prompt = system_prompt + didascalie_instruction + pacing_instruction
         
     google_api_key = google_api_key_override.strip() if google_api_key_override.strip() else os.environ.get("GOOGLE_API_KEY")
     openai_api_key = openai_api_key_override.strip() if openai_api_key_override.strip() else os.environ.get("OPENAI_API_KEY")
@@ -229,7 +218,7 @@ async def process_generation(engine, script, direction_output, char_key, use_lon
     try:
         final_audio = None
         
-        if engine == "Moteur 2 : OpenAI (Audio Génératif)":
+        if engine == "Moteur 2 : OpenAI":
             if not openai_api_key:
                 raise gr.Error("Clé API OpenAI manquante. Ajoutez-la dans les paramètres ou le fichier .env.")
             
@@ -237,31 +226,8 @@ async def process_generation(engine, script, direction_output, char_key, use_lon
             oai_model = "gpt-audio"
             oai_voice_id = OPENAI_VOICE_MAP[char_key]
             
-            if use_long_script:
-                gr.Info("Découpage du script en chunks pour OpenAI...")
-                chunks = split_text_intelligently(final_script)
-                conversation_history = []
-                
-                for i, chunk in enumerate(chunks):
-                    gr.Info(f"Génération de la partie {i+1}/{len(chunks)}...")
-                    chunk_audio, assistant_msg = await generate_openai_audio_chunk(
-                        client, oai_model, chunk, oai_voice_id, system_prompt, conversation_history
-                    )
-                    
-                    conversation_history.append({"role": "user", "content": chunk})
-                    conversation_history.append(assistant_msg)
-                    
-                    if final_audio is None:
-                        final_audio = chunk_audio
-                    else:
-                        crossfade_duration = min(15, len(chunk_audio), len(final_audio))
-                        if crossfade_duration > 0:
-                            final_audio = final_audio.append(chunk_audio, crossfade=crossfade_duration)
-                        else:
-                            final_audio = final_audio + chunk_audio
-            else:
-                gr.Info("Génération d'une seule traite via OpenAI...")
-                final_audio, _ = await generate_openai_audio_chunk(client, oai_model, final_script, oai_voice_id, system_prompt, [])
+            gr.Info("Génération d'une seule traite via OpenAI...")
+            final_audio, _ = await generate_openai_audio_chunk(client, oai_model, final_script, oai_voice_id, final_system_prompt, [])
             
         else:
             # Moteur Gemini Audio
@@ -272,31 +238,8 @@ async def process_generation(engine, script, direction_output, char_key, use_lon
             voice_id = CHARACTER_MAP[char_key]
             gemini_model = "gemini-3.1-flash-live-preview"
             
-            if use_long_script:
-                gr.Info("Découpage du script en chunks pour Gemini...")
-                chunks = split_text_intelligently(final_script)
-                conversation_history = []
-                
-                for i, chunk in enumerate(chunks):
-                    gr.Info(f"Génération de la partie {i+1}/{len(chunks)}...")
-                    chunk_audio, assistant_msg = await generate_audio_chunk(
-                        client, gemini_model, chunk, voice_id, system_prompt, conversation_history
-                    )
-                    
-                    conversation_history.append({"role": "user", "parts": [{"text": chunk}]})
-                    conversation_history.append(assistant_msg)
-                    
-                    if final_audio is None:
-                        final_audio = chunk_audio
-                    else:
-                        crossfade_duration = min(15, len(chunk_audio), len(final_audio))
-                        if crossfade_duration > 0:
-                            final_audio = final_audio.append(chunk_audio, crossfade=crossfade_duration)
-                        else:
-                            final_audio = final_audio + chunk_audio
-            else:
-                gr.Info("Génération d'une seule traite via Gemini...")
-                final_audio, _ = await generate_audio_chunk(client, gemini_model, final_script, voice_id, system_prompt, [])
+            gr.Info("Génération d'une seule traite via Gemini...")
+            final_audio, _ = await generate_audio_chunk(client, gemini_model, final_script, voice_id, final_system_prompt, [])
             
         # Conformation DAW : 48kHz
         final_audio = format_audio_to_daw_standard(final_audio)
@@ -317,6 +260,19 @@ async def process_generation(engine, script, direction_output, char_key, use_lon
         
     except Exception as e:
         raise gr.Error(f"Erreur lors de la génération : {str(e)}")
+
+def preview_prompt(duration_slider, hidden_didascalies, system_prompt):
+    """Fonction de débogage pour afficher le prompt complet."""
+    pacing_instruction = ""
+    if duration_slider == 0:
+        pacing_instruction = "\n\nCRITICAL CONSTRAINT: TARGET DURATION IS 3 SECONDS (Target word count: 8 to 9 words)."
+    elif duration_slider == 2:
+        pacing_instruction = "\n\nCRITICAL CONSTRAINT: TARGET DURATION IS 10 SECONDS (Target word count: 25 to 30 words)."
+    else:
+        pacing_instruction = "\n\nCRITICAL CONSTRAINT: TARGET DURATION IS 6 SECONDS (Target word count: 15 to 18 words)."
+        
+    didascalie_instruction = f"\n\nACTOR DIRECTION (DIDASCALIES): {hidden_didascalies}" if hidden_didascalies else ""
+    return system_prompt + didascalie_instruction + pacing_instruction
 
 # --- Interface Gradio ---
 custom_theme = gr.themes.Base(
@@ -353,6 +309,11 @@ h1 { text-align: center; color: #f8fafc; font-weight: 800 !important; letter-spa
 .tab-nav button.selected { color: #38bdf8 !important; border-bottom: 2px solid #38bdf8 !important; }
 /* Hide ugly Gradio footers */
 footer { display: none !important; }
+/* Force Radio to stretch equally on one line */
+.full-width-radio > div { display: flex !important; flex-wrap: nowrap !important; width: 100% !important; gap: 0.5rem !important; }
+.full-width-radio label { flex: 1 1 0 !important; display: flex !important; justify-content: center !important; text-align: center !important; padding: 0.5rem 0 !important; min-width: 0 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;}
+/* Tall Generate Button */
+.tall-btn { height: 100% !important; min-height: 80px !important; margin-top: 10px !important; }
 """
 
 with gr.Blocks(title="Voice-Gen") as demo:
@@ -364,35 +325,54 @@ with gr.Blocks(title="Voice-Gen") as demo:
             with gr.Row():
                 with gr.Column(scale=2):
                     script_input = gr.Textbox(
-                        label="Script (Didascalies autorisées entre crochets, ex: [Voix essoufflée])",
+                        label="Script",
                         lines=7,
                         placeholder="Entrez le texte ici..."
                     )
                     token_display = gr.Markdown("*Tokens estimés : 0*")
+                    hidden_didascalies = gr.State("")
                     
-                    # Mise à jour en temps réel des tokens
-                    def update_token_count(text):
+                    # Mise à jour en temps réel des tokens et reset des didascalies
+                    def update_script_input(text):
                         t = count_tokens(text)
-                        return f"*Tokens estimés (texte) : {t}*"
+                        return f"*Tokens estimés (texte) : {t}*", "", gr.update(value="🤖 Enrichir le script avec des didascalies", variant="secondary")
                     
-                    script_input.change(fn=update_token_count, inputs=script_input, outputs=token_display)
-
-                    gr.Markdown("### 🎭 Direction d'acteur assistée (Claude AI)", elem_classes="transparent-block")
-                    scenario_input = gr.Textbox(label="Contexte / Scénario additionnel (Optionnel)", lines=1, placeholder="Ex: Une conversation tendue dans un bar...")
-                    suggest_direction_btn = gr.Button("🤖 Analyser le script et suggérer une direction")
-                    direction_output = gr.Textbox(label="Direction générée (Sera injectée automatiquement au début de votre script)", lines=1)
+                    gr.Markdown("### 🎭 Didascalies intelligentes (Claude AI)", elem_classes="transparent-block")
+                    suggest_direction_btn = gr.Button("🤖 Enrichir le script avec des didascalies", variant="secondary")
+                    
+                    # Câblage de l'événement de changement du script (Doit être défini après le bouton)
+                    script_input.change(fn=update_script_input, inputs=script_input, outputs=[token_display, hidden_didascalies, suggest_direction_btn])
+                    
+                    gr.Markdown("### ⏱️ Durée", elem_classes="transparent-block")
+                    duration_slider = gr.Radio(
+                        choices=["🚀 Rapide", "🚶 Normal", "🐢 Long"],
+                        value="🚶 Normal",
+                        show_label=False,
+                        type="index",
+                        interactive=True,
+                        elem_classes="full-width-radio"
+                    )
                         
                 with gr.Column(scale=1):
                     engine_radio = gr.Radio(
-                        choices=["Moteur 1 : Gemini (Voix Pures)", "Moteur 2 : OpenAI (Audio Génératif)"],
-                        value="Moteur 1 : Gemini (Voix Pures)",
+                        choices=["Moteur 1 : Gemini", "Moteur 2 : OpenAI"],
+                        value="Moteur 1 : Gemini",
                         label="Moteur de Rendu"
                     )
-                    character_dropdown = gr.Dropdown(
-                        choices=list(CHARACTER_MAP.keys()),
-                        value=list(CHARACTER_MAP.keys())[0],
-                        label="Personnage (Gemini)"
-                    )
+                    with gr.Row(equal_height=True):
+                        character_dropdown = gr.Dropdown(
+                            choices=list(CHARACTER_MAP.keys()),
+                            value=list(CHARACTER_MAP.keys())[0],
+                            label="Personnage (Gemini)",
+                            scale=3
+                        )
+                        voice_demo_audio = gr.Audio(
+                            label="Pré-écoute",
+                            interactive=False,
+                            autoplay=True,
+                            type="filepath",
+                            scale=1
+                        )
                     
                     def update_character_dropdown(engine_choice):
                         if engine_choice and "OpenAI" in engine_choice:
@@ -402,6 +382,19 @@ with gr.Blocks(title="Voice-Gen") as demo:
                             choices = list(CHARACTER_MAP.keys())
                             return gr.update(label="Personnage (Gemini)", choices=choices, value=choices[0])
                             
+                    def update_demo_audio(engine_choice, character_name):
+                        # Find the internal ID of the voice
+                        voice_id = "charon" # Default
+                        if engine_choice and "OpenAI" in engine_choice:
+                            voice_id = OPENAI_VOICE_MAP.get(character_name, "alloy")
+                        else:
+                            voice_id = CHARACTER_MAP.get(character_name, "Charon")
+                        
+                        demo_path = os.path.join("demos", f"{voice_id}.mp3".lower())
+                        if os.path.exists(demo_path):
+                            return demo_path
+                        return None
+                            
                     engine_radio.change(
                         fn=update_character_dropdown, 
                         inputs=engine_radio, 
@@ -409,15 +402,22 @@ with gr.Blocks(title="Voice-Gen") as demo:
                         queue=False
                     )
                     
-                    long_script_checkbox = gr.Checkbox(
-                        label="Mode Script Long (Auto-assemblage & Contextuel)",
-                        info="Cochez cette case si votre texte dépasse 2-3 phrases pour éviter que l'API ne coupe l'audio.",
-                        value=False
+                    character_dropdown.change(
+                        fn=update_demo_audio,
+                        inputs=[engine_radio, character_dropdown],
+                        outputs=voice_demo_audio,
+                        queue=False
                     )
-                    generate_btn = gr.Button("🎧 Générer la piste", variant="primary")
+                    
+                    generate_btn = gr.Button("🎧 Générer la piste", variant="primary", size="lg", elem_classes="tall-btn")
                     
             audio_output = gr.Audio(label="Piste Générée (48kHz, 24-bit WAV)", type="filepath")
-            gr.Markdown("<div style='text-align: right; font-size: 0.75rem; color: #64748b; margin-top: 1rem;'>v1.0 - Sébastien Bédard - 2026 | <a href='https://github.com/sebedard-creator/Voice-Gen' target='_blank' style='color: #64748b; text-decoration: underline;'>GitHub</a></div>", elem_classes="transparent-block")
+            
+            with gr.Accordion("🔍 Outils de Débogage (Temporaire)", open=False, visible=False, elem_classes="transparent-block"):
+                debug_btn = gr.Button("Afficher le System Prompt Final")
+                debug_output = gr.Textbox(label="Texte caché envoyé aux acteurs virtuels", lines=8, interactive=False)
+            
+            gr.Markdown("<div style='text-align: right; font-size: 0.75rem; color: #64748b; margin-top: 1rem;'>v2.0 - Sébastien Bédard - 2026 | <a href='https://github.com/sebedard-creator/Voice-Gen' target='_blank' style='color: #64748b; text-decoration: underline;'>GitHub</a></div>", elem_classes="transparent-block")
             
         # ONGLET 2 : PARAMÈTRES
         with gr.Tab("Paramètres"):
@@ -514,15 +514,21 @@ with gr.Blocks(title="Voice-Gen") as demo:
 
     # Câblage des boutons
     suggest_direction_btn.click(
-        fn=suggest_actor_direction,
-        inputs=[script_input, scenario_input, anthropic_key_input],
-        outputs=direction_output
+        fn=generate_hidden_didascalies,
+        inputs=[script_input, anthropic_key_input],
+        outputs=[hidden_didascalies, suggest_direction_btn]
     )
 
     generate_btn.click(
         fn=process_generation,
-        inputs=[engine_radio, script_input, direction_output, character_dropdown, long_script_checkbox, api_key_input, openai_key_input, system_prompt_input],
+        inputs=[engine_radio, script_input, duration_slider, hidden_didascalies, character_dropdown, api_key_input, openai_key_input, system_prompt_input],
         outputs=audio_output
+    )
+    
+    debug_btn.click(
+        fn=preview_prompt,
+        inputs=[duration_slider, hidden_didascalies, system_prompt_input],
+        outputs=debug_output
     )
 
 if __name__ == "__main__":

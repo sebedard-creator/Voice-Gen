@@ -18,11 +18,10 @@ L'interface doit être organisée en deux onglets principaux :
 
 ### Onglet 1 : Studio (Génération)
 * **Menu déroulant "Moteur de Rendu" :** Choix entre Gemini (Moteur 1) et OpenAI (Moteur 2).
-* **Direction d'Acteur Assistée :** Un champ de scénario, un bouton appelant Claude Haiku pour suggérer une direction vocale, et un champ contenant la direction générée (qui sera injectée au début du script).
+* **Didascalies Intelligentes (Stealth Mode) :** Un bouton appelant Claude Haiku pour suggérer une direction vocale. Cette direction est stockée de manière invisible en arrière-plan et est injectée directement dans le System Prompt.
+* **Sélecteur de Durée :** Boutons radio (Rapide, Normal, Long) qui définissent le rythme imposé à l'IA.
 * **Zone de texte principale :** Pour le script/prompt.
-* **Affichage des tokens :** Estimation simple du nombre de mots.
-* **Menu déroulant "Personnage" :** Dynamique. Affiche les personnages Gemini (ex: "Le Tavernier" -> `Charon`) pour le Moteur 1, ou les voix OpenAI (ex: `alloy`, `echo`) pour le Moteur 2.
-* **Case à cocher :** "Mode Script Long (Auto-assemblage)".
+* **Menu déroulant "Personnage" :** Dynamique. Affiche les personnages Gemini (ex: "Le Tavernier" -> `Charon`) ou les 11 voix OpenAI.
 * **Bouton :** "Générer la piste".
 * **Lecteur de sortie :** Composant `gr.Audio` pour écouter et télécharger le résultat.
 
@@ -34,19 +33,19 @@ L'interface doit être organisée en deux onglets principaux :
 
 ### 4.1. Le System Prompt (Negative Prompting)
 La directive suivante doit être envoyée avec **chaque** requête API pour garantir un signal pur, et doit être modifiable dans l'onglet Paramètres :
-> "You are a professional voice actor recording in a soundproof vocal booth. Your track must be clinical and completely 'dry'. Absolute and unbreakable rule: You must generate ONLY the human voice. It is strictly forbidden to add any sound effects (foley), ambient noises, room reverberation, or music. The noise floor must be completely non-existent."
+> "ROLE: You are a professional French-Canadian voice actor from Montreal, Quebec.
+ENVIRONMENT: Professional soundproof vocal booth.
+TASK: Voice the provided script naturally.
+CRITICAL RULES:
+1. AUDIO QUALITY: Output MUST be completely "dry". NO background music, NO room reverberation...
+2. ACCENT & DIALECT: Speak in French with a natural, authentic standard Quebec accent...
+3. NO FILLER: Begin acting the script immediately. DO NOT introduce the audio."
 
 * **Moteur 1 (Gemini) :** Utiliser la **Live API** de Google (`client.aio.live.connect`). Le flux `inline_data.data` est du PCM 16-bit 24kHz brut, reconstruit via `pydub`.
 * **Moteur 2 (OpenAI) :** Utiliser `client.chat.completions.create` avec `modalities=["text", "audio"]`. Le flux base64 renvoyé est reconstruit via `pydub`.
-* **Découpage des scripts (Longs Scripts) :** Si la case est cochée, le backend découpera intelligemment le texte. Le système concatène l'audio avec un crossfade de 15ms. Export final obligatoire en **24-bit 48kHz WAV**.
+* **Anti-conversational wrapper :** Le texte final envoyé doit TOUJOURS être encapsulé dans une instruction stricte de ne pas faire d'introduction (ex: "CRITICAL INSTRUCTION: DO NOT INTRODUCE THE SCRIPT...").
 
-### 4.3. Mode "Script Long" (Auto-assemblage)
-1.  **Chunking :** Diviser le texte intelligemment aux points/doubles retours à la ligne.
-2.  **Maintien du contexte :** Envoyer les chunks séquentiellement en préservant l'historique de conversation (les messages `role: assistant` et `role: user` précédents) pour que l'acteur garde la même intonation.
-3.  **Assemblage :** Coller les chunks audio générés via `pydub` en appliquant un **crossfade de 15 millisecondes** pour éviter les clics numériques (zero-crossing issues).
-4.  **Nettoyage :** Supprimer les fichiers temporaires locaux ; ne retourner que le fichier master final.
-
-### 4.4. Gestion des Fichiers et Erreurs
+### 4.3. Gestion des Fichiers et Erreurs
 * **Indépendance Système (Cloud & Local) :** Tous les fichiers temporaires doivent aller dans un dossier local `temp/`.
 * **FFmpeg Hybride :** Le backend doit vérifier dynamiquement s'il est sous Windows (utiliser un exécutable local `bin/ffmpeg.exe`) ou sous Linux (utiliser le ffmpeg système de l'image Docker).
 * **Nommage auto :** `[NomDuPersonnage]_[YYYYMMDD]_[HHMMSS].wav`.
