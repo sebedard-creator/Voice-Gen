@@ -2,6 +2,12 @@
 
 Toutes les modifications apportées au projet seront tracées ici.
 
+## [2.1.0] - 2026-06-19
+### Corrigé / Amélioré
+- **Restauration du Jeu d'Acteur (Anti-Filler) :** Modification de l'instruction forcée anti-conversationnelle pour empêcher l'IA de lire le script de façon robotique. L'instruction "START YOUR ACTING PERFORMANCE IMMEDIATELY" remplace l'ancienne "JUST READ THIS EXACTLY" afin de préserver l'interprétation théâtrale.
+- **Perfectionnement du Persona Québécois :** Le System Prompt par défaut a été révisé en profondeur par l'ingénieur du son. Retrait du mot "international" et ajout de directives d'interprétation ("Interpret, then Voice") pour obtenir un accent montréalais authentique et hyper réaliste, sans tomber dans le "joual" ou le français européen.
+- **Régénération des Démos :** Toutes les pistes audio de pré-écoute (`demos/`) ont été mises à jour pour utiliser ce nouveau standard de voix.
+
 ## [2.0.0] - 2026-06-18
 ### Ajouté / Modifié (Pivot Architectural Majeur)
 - **Didascalies Furtives (Stealth Mode) :** Refonte totale de l'intégration Anthropic. Claude analyse désormais le script et génère une direction d'acteur en anglais (`[Hesitant, emotional]`) qui est **injectée secrètement** dans le System Prompt. Le script de l'utilisateur n'est plus pollué par des balises visibles.

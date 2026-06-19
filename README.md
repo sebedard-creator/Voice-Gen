@@ -42,4 +42,4 @@ This web application generates completely "dry", clinical, and artifact-free hum
 
 ## 👨‍💻 Author
 
-Created by **Sébastien Bédard** (2026).
+Created by **Sébastien Bédard** (2026). Version 2.1.

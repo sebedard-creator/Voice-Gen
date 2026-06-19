@@ -64,13 +64,13 @@ OPENAI_VOICE_MAP = {
     "Verse (Femme, Rythmique & Poétique)": "verse"
 }
 
-DEFAULT_SYSTEM_PROMPT = """ROLE: You are a professional French-Canadian voice actor from Montreal, Quebec.
+DEFAULT_SYSTEM_PROMPT = """ROLE: You are a professional French-Canadian voice actor from Montreal, Quebec (québécois).
 ENVIRONMENT: Professional soundproof vocal booth.
-TASK: Voice the provided script naturally.
+TASK: Interpret, then Voice the provided script naturally.
 
 CRITICAL RULES:
 1. AUDIO QUALITY: Output MUST be completely "dry". NO background music, NO room reverberation, NO ambient noise, NO foley/sound effects. ONLY the raw human voice.
-2. ACCENT & DIALECT: Speak in French with a natural, authentic standard Quebec accent (Accent québécois standard international). Do NOT use heavy slang or "joual". The pronunciation should clearly be from Montreal (authentic rhythm and intonation), but keep it professional. Under NO CIRCUMSTANCE should you sound like you are from France.
+2. ACCENT & DIALECT: Speak in French Canadian with a natural, authentic standard Quebec accent (Accent québécois). Do not use heavy slang or "joual". The pronunciation should clearly be from Montreal (authentic rhythm and intonation). Under NO CIRCUMSTANCE should you sound like you are from France.
 3. NO FILLER: Begin acting the script immediately. DO NOT introduce the audio. DO NOT acknowledge the prompt. NO conversational filler."""
 
 def count_tokens(text):
@@ -90,9 +90,9 @@ async def generate_audio_chunk(client, model_name, text_chunk, voice_id, system_
     
     # Contournement pour inclure le contexte dans un système asynchrone qui crée de nouvelles sessions
     if not contents and system_prompt:
-        final_text = f"CONSIGNES STRICTES POUR L'ACTEUR :\n{system_prompt}\n\n--- FIN DES CONSIGNES ---\n\nCRITICAL: DO NOT INTRODUCE THE SCRIPT. DO NOT SAY 'D'accord' OR 'Voici'. JUST READ THIS SCRIPT EXACTLY:\n\n{text_chunk}"
+        final_text = f"CONSIGNES STRICTES POUR L'ACTEUR :\n{system_prompt}\n\n--- FIN DES CONSIGNES ---\n\nCRITICAL: DO NOT INTRODUCE THE SCRIPT. DO NOT SAY 'D'accord' OR 'Voici'. START YOUR ACTING PERFORMANCE IMMEDIATELY:\n\n{text_chunk}"
     else:
-        final_text = f"CRITICAL: DO NOT INTRODUCE THE SCRIPT. DO NOT SAY 'D'accord' OR 'Voici'. JUST READ THIS SCRIPT EXACTLY:\n\n{text_chunk}"
+        final_text = f"CRITICAL: DO NOT INTRODUCE THE SCRIPT. DO NOT SAY 'D'accord' OR 'Voici'. START YOUR ACTING PERFORMANCE IMMEDIATELY:\n\n{text_chunk}"
         
     config = types.LiveConnectConfig(
         response_modalities=["AUDIO"],
@@ -141,7 +141,7 @@ async def generate_openai_audio_chunk(client, model_name, text_chunk, voice_id, 
     if system_prompt and not messages:
         messages.append({"role": "system", "content": system_prompt})
         
-    strict_user_prompt = f"CRITICAL INSTRUCTION: DO NOT INTRODUCE THE SCRIPT. DO NOT SAY 'D'accord', 'Voici', or any conversational filler. Start immediately with the script performance.\n\nSCRIPT TO PERFORM:\n{text_chunk}"
+    strict_user_prompt = f"CRITICAL INSTRUCTION: DO NOT INTRODUCE THE SCRIPT. DO NOT SAY 'D'accord', 'Voici', or any conversational filler. Start your acting performance immediately.\n\nSCRIPT TO PERFORM:\n{text_chunk}"
     messages.append({"role": "user", "content": strict_user_prompt})
     
     response = await client.chat.completions.create(
@@ -417,7 +417,7 @@ with gr.Blocks(title="Voice-Gen") as demo:
                 debug_btn = gr.Button("Afficher le System Prompt Final")
                 debug_output = gr.Textbox(label="Texte caché envoyé aux acteurs virtuels", lines=8, interactive=False)
             
-            gr.Markdown("<div style='text-align: right; font-size: 0.75rem; color: #64748b; margin-top: 1rem;'>v2.0 - Sébastien Bédard - 2026 | <a href='https://github.com/sebedard-creator/Voice-Gen' target='_blank' style='color: #64748b; text-decoration: underline;'>GitHub</a></div>", elem_classes="transparent-block")
+            gr.Markdown("<div style='text-align: right; font-size: 0.75rem; color: #64748b; margin-top: 1rem;'>v2.1 - Sébastien Bédard - 2026 | <a href='https://github.com/sebedard-creator/Voice-Gen' target='_blank' style='color: #64748b; text-decoration: underline;'>GitHub</a></div>", elem_classes="transparent-block")
             
         # ONGLET 2 : PARAMÈTRES
         with gr.Tab("Paramètres"):
